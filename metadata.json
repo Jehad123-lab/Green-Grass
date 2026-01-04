@@ -1,0 +1,5 @@
+{
+  "name": "Zenith Grass",
+  "description": "A high-performance, procedural 3D grass simulation using GLSL shaders and React Three Fiber. Features reactive wind controls and dynamic lighting.",
+  "requestFramePermissions": []
+}
