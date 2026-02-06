@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { GrassConfig } from '../../types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CaretLeft, CaretRight, Faders } from '@phosphor-icons/react';
 
 interface ControlsProps {
   config: GrassConfig;
@@ -7,69 +9,83 @@ interface ControlsProps {
 }
 
 const styles = {
-  panelContainer: {
+  container: {
     position: 'absolute' as const,
     top: '24px',
     left: '24px',
-    width: '340px',
     zIndex: 10,
-    height: 'calc(100vh - 48px)',
-    overflowY: 'auto' as const,
-    paddingBottom: '24px',
-    // Hide scrollbar but allow scroll
-    scrollbarWidth: 'none' as const,
-    msOverflowStyle: 'none' as const,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '16px',
+    maxHeight: 'calc(100vh - 48px)',
   },
-  glassPanel: {
-    background: 'rgba(18, 18, 18, 0.65)',
+  toggleButton: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(18, 18, 18, 0.65)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+    transition: 'all 0.2s ease',
+  },
+  panel: {
+    width: '320px',
+    backgroundColor: 'rgba(18, 18, 18, 0.8)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.05)',
     borderRadius: '16px',
     padding: '24px',
-    transition: 'all 0.3s ease',
+    overflowY: 'auto' as const,
+    maxHeight: 'calc(100vh - 48px)',
+    scrollbarWidth: 'none' as const,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '32px',
+    marginBottom: '24px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   title: {
     fontFamily: '"Bebas Neue", sans-serif',
-    fontSize: '24px',
+    fontSize: '28px',
     color: '#ffffff',
     letterSpacing: '0.05em',
     lineHeight: 1,
+    margin: 0,
   },
   subtitle: {
-    color: '#52525b',
+    color: '#71717a', // Content 3
     fontSize: '10px',
     fontFamily: '"Victor Mono", monospace',
     marginTop: '4px',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.1em',
   },
-  statusDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    backgroundColor: '#22c55e',
-    boxShadow: '0 0 10px rgba(34,197,94,0.5)',
-  },
   sectionTitle: {
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 700,
-    color: '#52525b',
+    color: '#a1a1aa', // Content 2
     textTransform: 'uppercase' as const,
-    marginBottom: '16px',
-    paddingTop: '16px',
-    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-    letterSpacing: '0.05em',
+    marginBottom: '12px',
+    marginTop: '20px',
+    letterSpacing: '0.1em',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   controlGroup: {
-    marginBottom: '20px',
+    marginBottom: '16px',
   },
   labelRow: {
     display: 'flex',
@@ -78,74 +94,92 @@ const styles = {
     marginBottom: '8px',
   },
   label: {
-    color: '#a1a1aa',
+    color: '#d4d4d8', // Content 2ish
     fontSize: '11px',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.1em',
+    letterSpacing: '0.05em',
     fontFamily: '"Inter", sans-serif',
     fontWeight: 500,
   },
   value: {
-    color: '#ffffff',
-    fontSize: '11px',
+    color: '#22c55e', // Accent
+    fontSize: '10px',
     fontFamily: '"Victor Mono", monospace',
   },
   sliderContainer: {
     position: 'relative' as const,
     width: '100%',
-    height: '4px',
-    backgroundColor: '#27272a', // Surface 3
-    borderRadius: '999px',
-    overflow: 'hidden',
+    height: '16px', // Taller hit area
+    display: 'flex',
+    alignItems: 'center',
     cursor: 'pointer',
   },
   sliderTrack: {
+    position: 'absolute' as const,
+    width: '100%',
+    height: '2px',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: '999px',
+    overflow: 'hidden',
+  },
+  sliderFill: {
     height: '100%',
-    backgroundColor: '#22c55e', // Accent
-    transition: 'width 0.1s ease-out',
+    backgroundColor: '#22c55e',
   },
   sliderInput: {
     position: 'absolute' as const,
-    top: 0,
-    left: 0,
     width: '100%',
     height: '100%',
     opacity: 0,
     cursor: 'pointer',
+    zIndex: 2,
     margin: 0,
   },
-  colorInputContainer: {
-    position: 'relative' as const,
-    width: '28px',
-    height: '28px',
+  sliderThumb: {
+    position: 'absolute' as const,
+    height: '10px',
+    width: '10px',
     borderRadius: '50%',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 0 10px rgba(34,197,94,0.8)',
+    transform: 'translateX(-50%)',
+    pointerEvents: 'none' as const,
+    zIndex: 1,
+  },
+  colorContainer: {
+    display: 'flex',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  colorWrapper: {
+    flex: 1,
+    height: '32px',
+    borderRadius: '6px',
     overflow: 'hidden',
-    border: '1px solid rgba(255,255,255,0.2)',
-    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+    position: 'relative' as const,
+    border: '1px solid rgba(255,255,255,0.1)',
+    cursor: 'pointer',
   },
   colorInput: {
     position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '150%',
-    height: '150%',
-    padding: 0,
+    top: '-50%',
+    left: '-50%',
+    width: '200%',
+    height: '200%',
     border: 'none',
     cursor: 'pointer',
-    background: 'none',
+    padding: 0,
   },
   footer: {
-    marginTop: '32px',
+    marginTop: '24px',
     paddingTop: '16px',
     borderTop: '1px solid rgba(255, 255, 255, 0.06)',
     textAlign: 'center' as const,
   },
   footerText: {
-    fontSize: '10px',
+    fontSize: '9px',
     color: '#52525b',
     fontFamily: '"Victor Mono", monospace',
-    opacity: 0.6,
   }
 };
 
@@ -156,40 +190,45 @@ const Slider: React.FC<{
   max: number;
   step: number;
   onChange: (val: number) => void;
-}> = ({ label, value, min, max, step, onChange }) => (
-  <div style={styles.controlGroup}>
-    <div style={styles.labelRow}>
-      <span style={styles.label}>{label}</span>
-      <span style={styles.value}>{value.toFixed(step < 0.1 ? 2 : 1)}</span>
+}> = ({ label, value, min, max, step, onChange }) => {
+  const percentage = ((value - min) / (max - min)) * 100;
+  
+  return (
+    <div style={styles.controlGroup}>
+      <div style={styles.labelRow}>
+        <span style={styles.label}>{label}</span>
+        <span style={styles.value}>{value.toFixed(step < 0.1 ? 2 : 1)}</span>
+      </div>
+      <div style={styles.sliderContainer}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          style={styles.sliderInput}
+        />
+        <div style={styles.sliderTrack}>
+          <div style={{ ...styles.sliderFill, width: `${percentage}%` }} />
+        </div>
+        <div style={{ ...styles.sliderThumb, left: `${percentage}%` }} />
+      </div>
     </div>
-    <div style={styles.sliderContainer}>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        style={styles.sliderInput}
-      />
-      <div 
-        style={{
-          ...styles.sliderTrack,
-          width: `${((value - min) / (max - min)) * 100}%`
-        }}
-      />
-    </div>
-  </div>
-);
+  );
+};
 
 const ColorPicker: React.FC<{
   label: string;
   value: string;
   onChange: (val: string) => void;
 }> = ({ label, value, onChange }) => (
-  <div style={{ ...styles.controlGroup, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-    <span style={styles.label}>{label}</span>
-    <div style={styles.colorInputContainer}>
+  <div style={{ ...styles.controlGroup, marginBottom: '0' }}>
+    <div style={styles.labelRow}>
+      <span style={styles.label}>{label}</span>
+      <span style={{...styles.value, color: value}}>{value}</span>
+    </div>
+    <div style={styles.colorWrapper}>
       <input
         type="color"
         value={value}
@@ -201,91 +240,119 @@ const ColorPicker: React.FC<{
 );
 
 const Controls: React.FC<ControlsProps> = ({ config, onChange }) => {
-  return (
-    <div className="animate-fade-in" style={styles.panelContainer}>
-      <div style={styles.glassPanel}>
-        <div style={styles.header}>
-            <div>
-                <h1 style={styles.title}>Zenith Grass</h1>
-                <p style={styles.subtitle}>GLSL / THREE.JS</p>
-            </div>
-            <div className="animate-pulse-glow" style={styles.statusDot}></div>
-        </div>
+  const [isOpen, setIsOpen] = useState(true);
 
-        <div>
-            <h2 style={styles.sectionTitle}>Lighting</h2>
-             <Slider
-                label="Sun Azimuth"
+  return (
+    <div style={styles.container}>
+      <AnimatePresence mode="wait">
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -50, filter: 'blur(10px)' }}
+            animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, x: -50, filter: 'blur(10px)' }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            style={styles.panel}
+          >
+            <div style={styles.header}>
+              <div>
+                <h1 style={styles.title}>Zenith Grass</h1>
+                <p style={styles.subtitle}>Interactive GLSL Simulation</p>
+              </div>
+              <Faders size={20} color="#22c55e" weight="fill" />
+            </div>
+
+            <div style={{ marginTop: '-12px' }}>
+              <h2 style={styles.sectionTitle}>Solar</h2>
+              <Slider
+                label="Azimuth"
                 value={config.sunAzimuth}
                 min={0}
                 max={360}
                 step={1}
                 onChange={(v) => onChange('sunAzimuth', v)}
-            />
-             <Slider
-                label="Sun Elevation"
+              />
+              <Slider
+                label="Elevation"
                 value={config.sunElevation}
                 min={0}
                 max={90}
                 step={0.5}
                 onChange={(v) => onChange('sunElevation', v)}
-            />
+              />
 
-            <h2 style={styles.sectionTitle}>Atmosphere</h2>
-            <Slider
+              <h2 style={styles.sectionTitle}>Environment</h2>
+              <Slider
                 label="Wind Speed"
                 value={config.windSpeed}
                 min={0}
                 max={5}
                 step={0.1}
                 onChange={(v) => onChange('windSpeed', v)}
-            />
-            <Slider
+              />
+              <Slider
                 label="Wind Strength"
                 value={config.windStrength}
                 min={0}
                 max={3}
                 step={0.1}
                 onChange={(v) => onChange('windStrength', v)}
-            />
+              />
 
-            <h2 style={styles.sectionTitle}>Botany</h2>
-            <Slider
-                label="Blade Count"
+              <h2 style={styles.sectionTitle}>Growth</h2>
+              <Slider
+                label="Density (Count)"
                 value={config.bladeCount}
                 min={1000}
                 max={100000}
                 step={1000}
                 onChange={(v) => onChange('bladeCount', v)}
-            />
-             <Slider
-                label="Blade Width"
+              />
+              <Slider
+                label="Width"
                 value={config.bladeWidth}
                 min={0.05}
                 max={0.3}
                 step={0.01}
                 onChange={(v) => onChange('bladeWidth', v)}
-            />
+              />
+              
+              <h2 style={styles.sectionTitle}>Pigmentation</h2>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <ColorPicker
+                    label="Base"
+                    value={config.baseColor}
+                    onChange={(v) => onChange('baseColor', v)}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                   <ColorPicker
+                    label="Tip"
+                    value={config.tipColor}
+                    onChange={(v) => onChange('tipColor', v)}
+                  />
+                </div>
+              </div>
+            </div>
             
-            <h2 style={styles.sectionTitle}>Pigment</h2>
-            <ColorPicker
-                label="Base Color"
-                value={config.baseColor}
-                onChange={(v) => onChange('baseColor', v)}
-            />
-            <ColorPicker
-                label="Tip Color"
-                value={config.tipColor}
-                onChange={(v) => onChange('tipColor', v)}
-            />
-        </div>
-        
-        <div style={styles.footer}>
-            <p style={styles.footerText}>
-                RENDERED IN REALTIME • VANILLA THREE
-            </p>
-        </div>
-      </div>
+            <div style={styles.footer}>
+              <p style={styles.footerText}>
+                THREE.JS • REACT • WEBGL
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setIsOpen(!isOpen)}
+        style={styles.toggleButton}
+        title={isOpen ? "Collapse Controls" : "Expand Controls"}
+      >
+        {isOpen ? <CaretLeft size={20} /> : <CaretRight size={20} />}
+      </motion.button>
     </div>
   );
 };
