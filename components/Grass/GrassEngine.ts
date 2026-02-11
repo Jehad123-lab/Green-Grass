@@ -52,9 +52,9 @@ export class GrassEngine {
     this.camera.position.set(0, 4, 12);
 
     // 3. Setup Renderer
+    // Removed powerPreference: "high-performance" to improve stability on dual-GPU systems and reduce context loss risk
     this.renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
-      powerPreference: "high-performance",
       stencil: false,
       depth: true
     });
@@ -65,6 +65,13 @@ export class GrassEngine {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.autoClear = false; // Important for trail persistence
+    
+    // Handle Context Loss Gracefully
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        console.warn('WebGL Context Lost - Attempting to restore...');
+    });
+    
     container.appendChild(this.renderer.domElement);
 
     // 4. Trail System Setup
@@ -87,8 +94,9 @@ export class GrassEngine {
 
     this.sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048; 
-    this.sunLight.shadow.mapSize.height = 2048;
+    // Reduced Shadow Map size for stability (1024 vs 2048)
+    this.sunLight.shadow.mapSize.width = 1024; 
+    this.sunLight.shadow.mapSize.height = 1024;
     this.sunLight.shadow.camera.near = 0.5;
     this.sunLight.shadow.camera.far = 50;
     this.sunLight.shadow.bias = -0.0001;
@@ -106,9 +114,11 @@ export class GrassEngine {
     this.scene.add(this.rimLight);
 
     // 7. Ground (Visual + Raycast Target)
+    const groundTexture = this.generateGroundTexture();
     const groundGeo = new THREE.CircleGeometry(45, 64);
     const groundMat = new THREE.MeshStandardMaterial({ 
-        color: '#030303', 
+        map: groundTexture,
+        color: '#888888', // Tint the texture slightly dark
         roughness: 0.9, 
         metalness: 0.1 
     });
@@ -247,6 +257,87 @@ export class GrassEngine {
     }
     const tex = new THREE.CanvasTexture(canvas);
     return tex;
+  }
+
+  private generateGroundTexture(): THREE.CanvasTexture {
+    const size = 1024;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, size, size);
+
+      for (let i = 0; i < 25; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const radius = 100 + Math.random() * 300;
+        const opacity = 0.05 + Math.random() * 0.08;
+        
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        if (Math.random() > 0.5) {
+            grad.addColorStop(0, `rgba(200, 180, 150, ${opacity})`); 
+        } else {
+            grad.addColorStop(0, `rgba(10, 5, 0, ${opacity})`);
+        }
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = 'overlay'; 
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      const imgData = ctx.getImageData(0, 0, size, size);
+      const data = imgData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        if (Math.random() < 0.2) {
+            const variation = (Math.random() - 0.5) * 20;
+            data[i] = Math.max(0, Math.min(255, data[i] + variation));
+            data[i+1] = Math.max(0, Math.min(255, data[i+1] + variation));
+            data[i+2] = Math.max(0, Math.min(255, data[i+2] + variation));
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      for (let i = 0; i < 200; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 2 + Math.random() * 5; 
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        
+        const grey = 40 + Math.random() * 60;
+        ctx.fillStyle = `rgb(${grey},${grey},${grey})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(x - r*0.3, y - r*0.3, r*0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(8, 8); 
+    
+    const maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    texture.anisotropy = maxAnisotropy;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    
+    return texture;
   }
 
   // Create curved, volumetric blade geometry
@@ -445,12 +536,37 @@ export class GrassEngine {
     window.removeEventListener('pointermove', this.onPointerMove);
     this.resizeObserver.disconnect();
     if (this.frameId) cancelAnimationFrame(this.frameId);
-    this.renderer.dispose();
-    this.controls.dispose();
+    
+    // Dispose scene objects recursively
+    this.scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+            object.geometry.dispose();
+            if (Array.isArray(object.material)) {
+                object.material.forEach(m => m.dispose());
+            } else if (object.material instanceof THREE.Material) {
+                object.material.dispose();
+            }
+        }
+    });
+
+    // Dispose managed resources
+    this.bladeTexture.dispose();
     this.trailTarget.dispose();
-    if (this.grassMesh) {
-        this.grassMesh.geometry.dispose();
+    this.trailBrush.geometry.dispose();
+    (this.trailBrush.material as THREE.Material).dispose();
+
+    this.renderer.dispose();
+    
+    // CRITICAL: Explicitly force WebGL context loss to prevent "Too many active contexts" error
+    // especially during hot reload or React StrictMode double-mounting
+    this.renderer.forceContextLoss();
+    
+    if (this.renderer.domElement && this.renderer.domElement.parentNode) {
+        this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }
+
+    this.controls.dispose();
     this.scene.clear();
+    this.trailScene.clear();
   }
 }
