@@ -21,16 +21,16 @@ export class GrassEngine {
   
   // Optimization: Pooling
   private maxInstances = 100000;
-  private offsets: Float32Array;
-  private scales: Float32Array;
-  private rotations: Float32Array;
-  private seeds: Float32Array; // For color variation
+  private offsets!: Float32Array;
+  private scales!: Float32Array;
+  private rotations!: Float32Array;
+  private seeds!: Float32Array; // For color variation
 
   // Interactive Trail System
-  private trailScene: THREE.Scene;
-  private trailCamera: THREE.OrthographicCamera;
-  private trailTarget: THREE.WebGLRenderTarget;
-  private trailBrush: THREE.Mesh;
+  private trailScene!: THREE.Scene;
+  private trailCamera!: THREE.OrthographicCamera;
+  private trailTarget!: THREE.WebGLRenderTarget;
+  private trailBrush!: THREE.Mesh;
   private raycaster: THREE.Raycaster;
   private pointer: THREE.Vector2;
   private groundPlane: THREE.Mesh; // Invisible plane for raycasting

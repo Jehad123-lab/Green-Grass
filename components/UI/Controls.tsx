@@ -3,7 +3,6 @@ import { GrassConfig } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CaretLeft, 
-  CaretRight, 
   Sun, 
   Wind, 
   Plant, 
