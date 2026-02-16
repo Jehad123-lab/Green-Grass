@@ -1,8 +1,5 @@
 # Zenith Grass
 
-![Zenith Grass UI](https://i.imgur.com/example.png) 
-*(Image placeholder)*
-
 A high-performance, procedural 3D grass simulation built with React, Three.js, and custom GLSL shaders. This project demonstrates an efficient method for rendering vast, dynamic fields of grass that react to wind and user interaction in real-time.
 
 ## Key Features
